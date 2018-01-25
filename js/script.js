@@ -1,14 +1,11 @@
-/**
- * Part 2 Challenges:
- *
- * - Change the gradient to be white
- *   to black, left-to-right only
- * - Make a checkerboard pattern (hint: https://www.opengl.org/sdk/docs/man/html/mod.xhtml)
- * - Make a checkerboard pattern without using conditions! (hint: https://www.opengl.org/sdk/docs/man/html/step.xhtml)
- */
+
 
 var canvas = document.getElementById("main");
 var gl = canvas.getContext('webgl');
+
+var NUM_METABALLS = 10;
+var WIDTH = canvas.width;
+var HEIGHT = canvas.height;
 
 /**
  * Shaders
@@ -27,7 +24,7 @@ function compileShader(shaderSource, shaderType) {
     return shader;
 }
 
-var vertexShader = compileShader(`\n\
+var vertexShader = compileShader('\n\
 attribute vec2 position;\n\
 \n\
 void main() {\n\
@@ -35,16 +32,30 @@ void main() {\n\
     // We set z to be 0.0, and w to be 1.0\n\
     gl_Position = vec4(position, 0.0, 1.0);\n\
 }\
-`, gl.VERTEX_SHADER);
+', gl.VERTEX_SHADER);
 
-var fragmentShader = compileShader(`\n\
+var fragmentShader = compileShader('\n\
+precision highp float;\n\
+uniform vec3 metaballs[' + NUM_METABALLS + '];\n\
+const float WIDTH = ' + WIDTH + '.0;\n\
+const float HEIGHT = ' + HEIGHT + '.0;\n\
 \n\
 void main(){\n\
-    gl_FragColor = vec4(gl_FragCoord.x/500.0, \n\
-                        gl_FragCoord.y/400.0, \n\
-                        0.0, 1.0);\n\
+    float x = gl_FragCoord.x;\n\
+    float y = gl_FragCoord.y;\n\
+    for (int i = 0; i < ' + NUM_METABALLS + '; i++) {\n\
+        vec3 mb = metaballs[i];\n\
+        float dx = mb.x - x;\n\
+        float dy = mb.y - y;\n\
+        float r = mb.z;\n\
+        if (dx*dx + dy*dy < r*r) {\n\
+            gl_FragColor = vec4(x/WIDTH, y/HEIGHT,\n\
+                                0.0, 1.0);\n\                               return;\n\
+        }\n\
+    }\n\
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n\
 }\n\
-`, gl.FRAGMENT_SHADER);
+', gl.FRAGMENT_SHADER);
 
 var program = gl.createProgram();
 gl.attachShader(program, vertexShader);
@@ -104,9 +115,48 @@ gl.vertexAttribPointer(positionHandle,
                        );
 
 /**
+ * Simulation setup
+ */
+
+var metaballs = [];
+
+for (var i = 0; i < NUM_METABALLS; i++) {
+  var radius = Math.random() * 60 + 10;
+  metaballs.push({
+    x: Math.random() * (WIDTH - 2 * radius) + radius,
+    y: Math.random() * (HEIGHT - 2 * radius) + radius,
+    r: radius
+  });
+}
+
+/**
+ * Uniform setup
+ */
+
+// Utility to complain loudly if we fail to find the uniform
+function getUniformLocation(program, name) {
+    var uniformLocation = gl.getUniformLocation(program, name);
+    if (uniformLocation === -1) {
+        throw 'Can not find uniform ' + name + '.';
+    }
+    return uniformLocation;
+}
+
+// To send the data to the GPU, we first need to
+// flatten our data into a single array.
+var dataToSendToGPU = new Float32Array(3 * NUM_METABALLS);
+for (var i = 0; i < NUM_METABALLS; i++) {
+  var baseIndex = 3 * i;
+  var mb = metaballs[i];
+  dataToSendToGPU[baseIndex + 0] = mb.x;
+  dataToSendToGPU[baseIndex + 1] = mb.y;
+  dataToSendToGPU[baseIndex + 2] = mb.r;
+}
+var metaballsHandle = getUniformLocation(program, 'metaballs');
+gl.uniform3fv(metaballsHandle, dataToSendToGPU);
+
+/**
  * Draw
  */
 
-// Render the 4 vertices specified above (starting at index 0)
-// in TRIANGLE_STRIP mode.
 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
