@@ -1,5 +1,6 @@
 
 
+
 var canvas = document.getElementById("main");
 var gl = canvas.getContext('webgl');
 
@@ -43,17 +44,20 @@ const float HEIGHT = ' + HEIGHT + '.0;\n\
 void main(){\n\
     float x = gl_FragCoord.x;\n\
     float y = gl_FragCoord.y;\n\
+    float v = 0.0;\n\
     for (int i = 0; i < ' + NUM_METABALLS + '; i++) {\n\
         vec3 mb = metaballs[i];\n\
         float dx = mb.x - x;\n\
         float dy = mb.y - y;\n\
         float r = mb.z;\n\
-        if (dx*dx + dy*dy < r*r) {\n\
-            gl_FragColor = vec4(x/WIDTH, y/HEIGHT,\n\
-                                0.0, 1.0);\n\                               return;\n\
-        }\n\
+        v += r*r/(dx*dx + dy*dy);\n\
     }\n\
-    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n\
+    if (v > 1.0) {\n\
+        gl_FragColor = vec4(.1, y/HEIGHT,\n\
+                              0.8, 0.9);\n\
+    } else {\n\
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n\
+    }\n\
 }\n\
 ', gl.FRAGMENT_SHADER);
 
@@ -125,6 +129,8 @@ for (var i = 0; i < NUM_METABALLS; i++) {
   metaballs.push({
     x: Math.random() * (WIDTH - 2 * radius) + radius,
     y: Math.random() * (HEIGHT - 2 * radius) + radius,
+    vx: Math.random() * 10 - 5,
+    vy: Math.random() * 10 - 5,
     r: radius
   });
 }
@@ -141,22 +147,50 @@ function getUniformLocation(program, name) {
     }
     return uniformLocation;
 }
-
-// To send the data to the GPU, we first need to
-// flatten our data into a single array.
-var dataToSendToGPU = new Float32Array(3 * NUM_METABALLS);
-for (var i = 0; i < NUM_METABALLS; i++) {
-  var baseIndex = 3 * i;
-  var mb = metaballs[i];
-  dataToSendToGPU[baseIndex + 0] = mb.x;
-  dataToSendToGPU[baseIndex + 1] = mb.y;
-  dataToSendToGPU[baseIndex + 2] = mb.r;
-}
 var metaballsHandle = getUniformLocation(program, 'metaballs');
-gl.uniform3fv(metaballsHandle, dataToSendToGPU);
 
 /**
- * Draw
+ * Simulation step, data transfer, and drawing
  */
 
-gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+var step = function() {
+  // Update positions and speeds
+  for (var i = 0; i < NUM_METABALLS; i++) {
+    var mb = metaballs[i];
+
+    mb.x += mb.vx;
+    if (mb.x - mb.r < 0) {
+      mb.x = mb.r + 2;
+      mb.vx = Math.abs(mb.vx);
+    } else if (mb.x + mb.r > WIDTH) {
+      mb.x = WIDTH - mb.r;
+      mb.vx = -Math.abs(mb.vx);
+    }
+    mb.y += mb.vy;
+    if (mb.y - mb.r < 0) {
+      mb.y = mb.r + 2;
+      mb.vy = Math.abs(mb.vy);
+    } else if (mb.y + mb.r > HEIGHT) {
+      mb.y = HEIGHT - mb.r;
+      mb.vy = -Math.abs(mb.vy);
+    }
+  }
+
+  // To send the data to the GPU, we first need to
+  // flatten our data into a single array.
+  var dataToSendToGPU = new Float32Array(3 * NUM_METABALLS);
+  for (var i = 0; i < NUM_METABALLS; i++) {
+    var baseIndex = 3 * i;
+    var mb = metaballs[i];
+    dataToSendToGPU[baseIndex + 0] = mb.x;
+    dataToSendToGPU[baseIndex + 1] = mb.y;
+    dataToSendToGPU[baseIndex + 2] = mb.r;
+  }
+  gl.uniform3fv(metaballsHandle, dataToSendToGPU);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  requestAnimationFrame(step);
+};
+
+step();
