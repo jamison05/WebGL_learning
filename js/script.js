@@ -50,7 +50,7 @@ void main(){\n\
         float dx = mb.x - x;\n\
         float dy = mb.y - y;\n\
         float r = mb.z;\n\
-        v += r*r/(dx*dx + dy*dy);\n\
+        v += r*r/((dx*dx) + dy*dy);\n\
     }\n\
     if (v > 1.0) {\n\
         gl_FragColor = vec4(.1, y/HEIGHT,\n\
@@ -129,8 +129,8 @@ for (var i = 0; i < NUM_METABALLS; i++) {
   metaballs.push({
     x: Math.random() * (WIDTH - 2 * radius) + radius,
     y: Math.random() * (HEIGHT - 2 * radius) + radius,
-    vx: Math.random() * 10 - 5,
-    vy: Math.random() * 10 - 5,
+    vx: Math.random() * 20 - 5,
+    vy: Math.random() * 20 - 5,
     r: radius
   });
 }
